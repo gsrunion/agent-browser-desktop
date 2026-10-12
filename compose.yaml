@@ -1,7 +1,7 @@
 services:
   browser:
     build: .
-    image: agent-browser-desktop:local
+    image: ${BROWSER_IMAGE:-ghcr.io/gsrunion/agent-browser-desktop:latest}
     hostname: agent-browser-desktop
     restart: unless-stopped
     init: true

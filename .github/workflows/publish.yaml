@@ -1,0 +1,121 @@
+name: Test and publish container
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag, for example v0.1.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image: ${{ steps.version.outputs.image }}
+    steps:
+      - id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          [[ "$REQUESTED_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          echo "version=$REQUESTED_VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      BROWSER_IMAGE: ${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: ${{ env.BROWSER_IMAGE }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      - name: Verify empty image
+        run: |
+          docker run --rm --entrypoint sh "$BROWSER_IMAGE" -c \
+            'test -z "$(find /profile /downloads -mindepth 1 -print -quit)"'
+      - name: Verify shared browser and VNC control
+        run: |
+          docker compose up -d --no-build
+          for attempt in $(seq 1 90); do
+            container=$(docker compose ps -q browser)
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$container")
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          [ "$status" = healthy ] || { docker compose logs; exit 1; }
+          docker compose exec -T browser node /opt/mcp/smoke.mjs
+          python3 scripts/check-vnc.py --type-test
+          docker compose exec -T browser node /opt/mcp/smoke.mjs --verify-vnc
+          docker compose up -d --force-recreate --no-build
+          for attempt in $(seq 1 90); do
+            container=$(docker compose ps -q browser)
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$container")
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          [ "$status" = healthy ] || { docker compose logs; exit 1; }
+          docker compose exec -T browser node /opt/mcp/smoke.mjs --verify-vnc
+      - name: Push tested image
+        run: docker push "$BROWSER_IMAGE"
+      - name: Collect logs
+        if: failure()
+        run: docker compose logs --tail=150
+      - name: Stop test container
+        if: always()
+        run: docker compose down --volumes
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish ARM64 and AMD64 manifest
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --annotation "index:org.opencontainers.image.description=Chromium, VNC desktop, and Playwright MCP for background agents" \
+            --tag "$IMAGE:$VERSION" --tag "$IMAGE:latest" \
+            "$IMAGE:$VERSION-amd64" "$IMAGE:$VERSION-arm64"

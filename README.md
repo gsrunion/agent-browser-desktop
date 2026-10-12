@@ -13,11 +13,14 @@ Install Docker with Compose on a Linux host or use Docker Desktop on macOS/Windo
 ```sh
 git clone https://github.com/gsrunion/agent-browser-desktop.git
 cd agent-browser-desktop
-docker compose up -d --build
+docker compose pull
+docker compose up -d --no-build
 docker compose ps
 ```
 
-The first build installs Chromium and the MCP packages. Wait for the container to become `healthy`.
+This pulls `ghcr.io/gsrunion/agent-browser-desktop:latest`, available for Linux ARM64 and AMD64. Wait for the container to become `healthy`. For a fixed version, set `BROWSER_IMAGE=ghcr.io/gsrunion/agent-browser-desktop:v0.1.1` in `.env`.
+
+To build locally instead, run `docker compose up -d --build`. The Dockerfile installs Chromium and the MCP packages without copying any runtime data.
 
 | Connection | Default address | Purpose |
 | --- | --- | --- |
@@ -33,7 +36,7 @@ The [v0.1.0 release](https://github.com/gsrunion/agent-browser-desktop/releases/
 ```sh
 shasum -a 256 -c SHA256SUMS
 docker load -i agent-browser-desktop-v0.1.0-linux-arm64.tar.gz
-docker compose up -d --no-build
+BROWSER_IMAGE=agent-browser-desktop:local docker compose up -d --no-build
 ```
 
 Use the source build on AMD64. The release archive is an exported **built image**, never a committed runtime container, and contains no saved browser state.
@@ -101,7 +104,7 @@ These volumes are separate from the image. The image stays clean even after you 
 
 The image has an allowlisted build context: only the Dockerfile, supervisor configuration, MCP filter, and smoke-check script are sent into it. There are no personal bind mounts, credentials, or hardcoded deployment paths.
 
-Move the source to another Docker host and run `docker compose up -d --build` for a fresh instance. Linux ARM64 and AMD64 builds use the same Dockerfile; validation performed for this release is listed below. Keep the hostname stable when recreating a container so Chromium's profile lock remains valid. Never mount one profile in two running browsers.
+Move the source to another Docker host and run `docker compose pull` followed by `docker compose up -d --no-build` for a fresh instance. Linux ARM64 and AMD64 builds use the same Dockerfile; validation performed for this release is listed below. Keep the hostname stable when recreating a container so Chromium's profile lock remains valid. Never mount one profile in two running browsers.
 
 ## Operations
 
@@ -119,7 +122,11 @@ docker compose exec browser node /opt/mcp/smoke.mjs --verify-vnc
 # Stop; profile and downloads remain
 docker compose down
 
-# Update Chromium packages by rebuilding the image
+# Update to the latest published image
+docker compose pull
+docker compose up -d --no-build
+
+# Or update Chromium packages by rebuilding locally
 docker compose build --pull --no-cache
 docker compose up -d
 ```
@@ -144,7 +151,11 @@ The package does not include the original deployment's Telegram approvals or age
 - [Supergateway](https://github.com/supercorp-ai/supergateway), pinned to `4.1.0`, serving Streamable HTTP
 - Supervisor for startup, child processes, and restarts
 
-Node and Debian base tags follow their maintained release lines; distro Chromium packages update when you rebuild without cache. JavaScript direct dependencies are version-pinned; transitive dependency resolution is performed during each build.
+Node and Debian base tags follow their maintained release lines; distro Chromium packages update when you rebuild without cache. JavaScript direct dependencies are version-pinned; transitive dependency resolution is performed during each build. Version tags and `latest` are published to [GitHub Container Registry](https://github.com/gsrunion/agent-browser-desktop/pkgs/container/agent-browser-desktop).
+
+## Publishing
+
+Pushing a version tag such as `v0.1.1` starts the included GitHub Actions workflow. It builds on native ARM64 and AMD64 runners, tests MCP and VNC control plus browser-session persistence, and publishes the tested images and combined platform manifest to GHCR. The workflow uses GitHub's short-lived token with package-write permission; no registry credential is stored in the repository or image. A new GHCR package defaults to private; its owner must set its visibility to public for anonymous pulls.
 
 ## Validation
 

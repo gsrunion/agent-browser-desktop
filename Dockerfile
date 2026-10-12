@@ -1,4 +1,7 @@
 FROM node:22-trixie-slim
+LABEL org.opencontainers.image.source="https://github.com/gsrunion/agent-browser-desktop" \
+      org.opencontainers.image.description="Chromium, VNC desktop, and Playwright MCP in one container for background agents" \
+      org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium xvfb x11vnc openbox socat supervisor fonts-liberation ca-certificates curl \
