@@ -18,7 +18,7 @@ docker compose up -d --no-build
 docker compose ps
 ```
 
-This pulls `ghcr.io/gsrunion/agent-browser-desktop:latest`, available for Linux ARM64 and AMD64. Wait for the container to become `healthy`. For a fixed version, set `BROWSER_IMAGE=ghcr.io/gsrunion/agent-browser-desktop:v0.1.1` in `.env`.
+This pulls `ghcr.io/gsrunion/agent-browser-desktop:latest`, available for Linux ARM64 and AMD64. Wait for the container to become `healthy`. For a fixed version, set `BROWSER_IMAGE=ghcr.io/gsrunion/agent-browser-desktop:v0.1.2` in `.env`.
 
 To build locally instead, run `docker compose up -d --build`. The Dockerfile installs Chromium and the MCP packages without copying any runtime data.
 
@@ -155,7 +155,7 @@ Node and Debian base tags follow their maintained release lines; distro Chromium
 
 ## Publishing
 
-Pushing a version tag such as `v0.1.1` starts the included GitHub Actions workflow. It builds on native ARM64 and AMD64 runners, tests MCP and VNC control plus browser-session persistence, and publishes the tested images and combined platform manifest to GHCR. The workflow uses GitHub's short-lived token with package-write permission; no registry credential is stored in the repository or image. A new GHCR package defaults to private; its owner must set its visibility to public for anonymous pulls.
+Pushing a version tag such as `v0.1.2` starts the included GitHub Actions workflow. It builds on native ARM64 and AMD64 runners, tests MCP and VNC control plus browser-session persistence, and publishes the tested images and combined platform manifest to GHCR. The workflow uses GitHub's short-lived token with package-write permission; no registry credential is stored in the repository or image. A new GHCR package defaults to private; its owner must set its visibility to public for anonymous pulls.
 
 ## Validation
 
