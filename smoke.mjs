@@ -9,7 +9,12 @@ try {
   const { tools } = await client.listTools();
   assert(tools.some(t => t.name === 'browser_navigate'));
   assert(!tools.some(t => ['browser_run_code', 'browser_run_code_unsafe'].includes(t.name)));
-  if (process.argv.includes('--verify-vnc')) {
+  if (process.argv.includes('--verify-session')) {
+    const snapshot = await client.callTool({ name: 'browser_snapshot', arguments: {} });
+    assert(!snapshot.isError);
+    assert(JSON.stringify(snapshot).includes('Shared browser works'), 'Browser tab was not restored');
+    console.log('PASS: browser tab restored after recreation');
+  } else if (process.argv.includes('--verify-vnc')) {
     const snapshot = await client.callTool({ name: 'browser_snapshot', arguments: {} });
     assert(!snapshot.isError);
     assert(JSON.stringify(snapshot).includes('vnc-control'), 'VNC typing did not reach the browser');

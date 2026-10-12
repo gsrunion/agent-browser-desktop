@@ -79,6 +79,7 @@ jobs:
           docker compose exec -T browser node /opt/mcp/smoke.mjs
           python3 scripts/check-vnc.py --type-test
           docker compose exec -T browser node /opt/mcp/smoke.mjs --verify-vnc
+          docker compose exec -T browser sh -c 'printf persistent > /profile/smoke-marker'
           docker compose up -d --force-recreate --no-build
           for attempt in $(seq 1 90); do
             container=$(docker compose ps -q browser)
@@ -87,7 +88,8 @@ jobs:
             sleep 2
           done
           [ "$status" = healthy ] || { docker compose logs; exit 1; }
-          docker compose exec -T browser node /opt/mcp/smoke.mjs --verify-vnc
+          docker compose exec -T browser sh -c 'test "$(cat /profile/smoke-marker)" = persistent'
+          docker compose exec -T browser node /opt/mcp/smoke.mjs --verify-session
       - name: Push tested image
         run: docker push "$BROWSER_IMAGE"
       - name: Collect logs
