@@ -1,0 +1,8 @@
+.env
+profile/
+downloads/
+*.log
+*.png
+*.zip
+node_modules/
+.DS_Store

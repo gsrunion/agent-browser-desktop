@@ -1,0 +1,24 @@
+services:
+  browser:
+    build: .
+    image: agent-browser-desktop:local
+    hostname: agent-browser-desktop
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${MCP_PORT:-18795}:8000"
+      - "127.0.0.1:${VNC_PORT:-5901}:5900"
+    volumes:
+      - browser-profile:/profile
+      - browser-downloads:/downloads
+    shm_size: 512m
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 512
+    stop_grace_period: 40s
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+volumes:
+  browser-profile:
+  browser-downloads:

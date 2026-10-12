@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!supervisord.conf
+!mcp-filter.mjs
+!smoke.mjs
